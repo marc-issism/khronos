@@ -1,0 +1,78 @@
+{
+
+"users": [
+  {
+    "user_id": 0,
+    "activity_legend": [
+      {
+        "key": "sleep",
+        "color": "#000"
+      },
+      {
+        "key": "transportation",
+        "color": "#fff"
+      }
+    ] 
+  },
+  {
+    "user_id": 1,
+    "activity_legend": [
+      {
+        "key": "exercise",
+        "color": "#123"
+      },
+      {
+        "key": "work",
+        "color": "#f0f"
+      }
+    ] 
+  }
+],
+
+"days": [
+  {
+    "user_id": 0,
+    "date": "2025-01-01",
+    "activities": [
+      {
+        "start_time": "10:00pm",
+        "end_time": "11:30pm",
+        "legend": {
+          "key": "sleep",
+          "color": "#000"
+        }
+      },
+      {
+        "start_time": "9:00pm",
+        "end_time": "10:00pm",
+        "legend": {
+          "key": "sleep",
+          "color": "#000"
+        }
+      }
+    ]
+  },
+  {
+    "user_id": 0,
+    "date": "2025-01-02",
+    "activities": [
+      {
+        "start_time": "10:00pm",
+        "end_time": "11:30pm",
+        "legend": {
+          "key": "sleep",
+          "color": "#000"
+        }
+      },
+      {
+        "start_time": "9:00pm",
+        "end_time": "10:00pm",
+        "legend": {
+          "key": "sleep",
+          "color": "#000"
+        }
+      }
+    ]
+  }
+]
+}
