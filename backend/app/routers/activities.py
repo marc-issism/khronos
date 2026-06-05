@@ -1,14 +1,11 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
-from sqlmodel import Session
 
-from app.schemas.activity_schema import ActivityResponse, ActivityCreate, ActivityUpdate
-from app.database import get_db
+from app.database import DB
 import app.models as models
 
-DB = Annotated[Session, Depends(get_db)]
+from sqlalchemy.orm import selectinload
+from app.schemas.activity import ActivityResponse, ActivityCreate, ActivityUpdate
 
 activities_router = APIRouter(
   prefix='/activities'
@@ -16,11 +13,10 @@ activities_router = APIRouter(
 
 @activities_router.get(
   '/',
-  include_in_schema=False
 )
-def get_activities(db: DB):
-  result = db.execute(select(models.Activity)).scalars().all()
-  return result
+async def get_activities(db: DB):
+  result = await db.execute(select(models.Activity))
+  return result.scalars().all()
 
 
 @activities_router.post(
@@ -28,7 +24,7 @@ def get_activities(db: DB):
   response_model=ActivityResponse,
   status_code=status.HTTP_201_CREATED
 )
-def create_activity(activity: ActivityCreate, db: DB):
+async def create_activity(activity: ActivityCreate, db: DB):
   #TODO: Exception handling
   new_activity = models.Activity(
     user_id = activity.user_id,
@@ -39,8 +35,8 @@ def create_activity(activity: ActivityCreate, db: DB):
   )
 
   db.add(new_activity)
-  db.commit()
-  db.refresh(new_activity)
+  await db.commit()
+  await db.refresh(new_activity)
 
   return new_activity
   

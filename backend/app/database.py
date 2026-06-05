@@ -1,7 +1,12 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from typing import Annotated
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./khronos.db" #TODO: Swap to postgres
+from fastapi import Depends
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+import aiosqlite as aiosqlite
+
+SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./khronos.db" #TODO: Swap to postgres
+# +aiosqlite is the async engine
 
 # DATABASE = 'postgresql'
 # USER = 'postgres'
@@ -12,18 +17,24 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///./khronos.db" #TODO: Swap to postgres
 # engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME }')
 
 
-engine = create_engine(
+engine = create_async_engine(
   SQLALCHEMY_DATABASE_URL,
   connect_args={"check_same_thread": False} #TODO: for sqlite only
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+AsyncSessionLocal = async_sessionmaker(
+  engine, 
+  class_ = AsyncSession,
+  expire_on_commit = False,
+)
 # session = transaction with database, autocommit and autoflush = False allow US to control when changes happen
 
 class Base(DeclarativeBase):
   pass
 
 
-def get_db():
-  with SessionLocal() as db: 
-    yield db # gives this route a database session
+async def get_db():
+  async with AsyncSessionLocal() as session: 
+    yield session # gives this route a database session
+
+DB = Annotated[AsyncSession, Depends(get_db)]

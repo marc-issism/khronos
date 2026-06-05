@@ -4,16 +4,29 @@
 # 3. API routes (endpoints) 
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.exceptions import RequestValidationError
+
+from contextlib import asynccontextmanager
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from sqlalchemy.ext.asyncio  import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import Base, engine
 
-from app.routers.users_router import user_router
-from app.routers.legends_router import legends_router
-from app.routers.activities_router import activities_router
+from app.routers.users import user_router
+from app.routers.legends import legends_router
+from app.routers.activities import activities_router
 
-Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+  # startup
+  async with engine.begin() as connection:
+    await connection.run_sync(Base.metadata.create_all)
+  yield
+  # shutdown
+  await engine.dispose()
 
 # app.mount('/media', staticFiles(directory='media'), name='media') for serving files
 

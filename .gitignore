@@ -5,3 +5,7 @@
 **/__pycache__
 
 frontend/node_modules/*
+
+khronos.db
+
+backend/khronos.db

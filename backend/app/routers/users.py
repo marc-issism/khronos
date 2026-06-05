@@ -1,27 +1,27 @@
-
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
-from sqlmodel import Session
 
-from app.schemas.user_schema import UserResponse, UserCreate, UserUpdate
-from app.database import get_db
+from app.schemas.user import UserResponse, UserCreate, UserUpdate
+from app.database import DB
 import app.models as models
 
-DB = Annotated[Session, Depends(get_db)]
+# from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from sqlalchemy.orm import selectinload
+
+
+# await db.refresh(user, attribute_names=["activities"]) when refreshing with relation
 
 user_router = APIRouter(
   prefix='/users'
 )
 
 @user_router.get(
-  '/',
-  include_in_schema=False,
+  '/'
 )
-def get_users(db: DB):
-  result = db.execute(select(models.User)).scalars().all()
-  return result
+async def get_users(db: DB):
+  result = await db.execute(select(models.User))
+
+  return result.scalars().all()
 
 
 @user_router.post(
@@ -29,8 +29,8 @@ def get_users(db: DB):
   response_model=UserResponse,
   status_code=status.HTTP_201_CREATED
 )
-def create_user(user: UserCreate, db: DB):
-  result = db.execute(select(models.User).where(models.User.username == user.username))
+async def create_user(user: UserCreate, db: DB):
+  result = await db.execute(select(models.User).where(models.User.username == user.username))
   existing_user = result.scalars().first()
 
   if existing_user:
@@ -39,7 +39,7 @@ def create_user(user: UserCreate, db: DB):
       detail="Username already exists"
     )
   
-  result = db.execute(select(models.User).where(models.User.email == user.email))
+  result = await db.execute(select(models.User).where(models.User.email == user.email))
   existing_email = result.scalars().first()
 
   if existing_email:
@@ -54,25 +54,24 @@ def create_user(user: UserCreate, db: DB):
   )
 
   db.add(new_user) # stages insert
-  db.commit() # executes insert and saves
-  db.refresh(new_user) # 
+  await db.commit() # executes insert and saves
+  await db.refresh(new_user) 
 
   return new_user
 
 
 @user_router.get(
   '/{user_id}',
-  include_in_schema=False,
   status_code=status.HTTP_200_OK
 )
-def get_user_from_id(user_id: int, db: DB):
-  result = db.execute(select(models.User).where(models.User.id == user_id)).scalars().first()
+async def get_user_from_id(user_id: int, db: DB):
+  result = await db.execute(select(models.User).where(models.User.id == user_id))
   if not result:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
       detail="User does not exist"
     )
-  return result
+  return result.scalars().first()
 
 
 @user_router.put(
@@ -80,12 +79,13 @@ def get_user_from_id(user_id: int, db: DB):
   response_model=UserResponse,
   status_code=status.HTTP_200_OK
 )
-def replace_user(
+async def replace_user(
   user_id: int,
   user: UserCreate,
   db: DB
 ):
-  existing_user = db.execute(select(models.User).where(models.User.id == user_id)).scalars().first()
+  result = await db.execute(select(models.User).where(models.User.id == user_id))
+  existing_user = result.scalars().first()
   if not existing_user:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
@@ -93,8 +93,8 @@ def replace_user(
     )
   existing_user.username = user.username
   existing_user.email = user.email
-  db.commit()
-  db.refresh(existing_user)
+  await db.commit()
+  await db.refresh(existing_user)
   return existing_user
 
 
@@ -103,12 +103,13 @@ def replace_user(
   response_model=UserResponse,
   status_code=status.HTTP_200_OK
 )
-def patch_user(
+async def patch_user(
   user_id: int,
   user: UserUpdate,
   db: DB
 ):
-  existing_user = db.execute(select(models.User).where(models.User.id == user_id)).scalars().first()
+  result = await db.execute(select(models.User).where(models.User.id == user_id))
+  existing_user = result.scalars().first()
   if not existing_user:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
@@ -119,8 +120,8 @@ def patch_user(
   for field, value in user.items():
     setattr(existing_user, field, value)
 
-  db.commit()
-  db.refresh(existing_user)
+  await db.commit()
+  await db.refresh(existing_user)
   return existing_user
 
 
@@ -128,28 +129,32 @@ def patch_user(
   '/{user_id}',
   status_code=status.HTTP_204_NO_CONTENT
 )
-def delete_user(
+async def delete_user(
   user_id: int,
   db: DB
 ):
-  existing_user = db.execute(select(models.User).where(models.User.id == user_id)).scalars().first()
+  result = await db.execute(select(models.User).where(models.User.id == user_id))
+  existing_user = result.scalars().first()
   if not existing_user:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
       detail="User does not exist"
     )
-  db.delete(existing_user)
-  db.commit()
+  await db.delete(existing_user)
+  await db.commit()
 
 
-#TODO: fix this 
-@user_router.get('/{user_id}/activities', include_in_schema=False, status_code=status.HTTP_200_OK)
-def get_activities_by_user_id(user_id: int, db:DB):
-  existing_user = db.execute(select(models.User).where(models.User.id == user_id)).scalars().first()
-  if not existing_user:
+@user_router.get(
+  '/{user_id}/activities'
+  , status_code=status.HTTP_200_OK
+)
+async def get_activities_by_user_id(user_id: int, db:DB):
+  existing_user = await db.execute(select(models.User).where(models.User.id == user_id))
+  if not existing_user.scalars().first():
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
       detail="User does not exist"
     )
-  result = db.execute(select(models.User.activities)).scalars().all()
-  return result
+  result = await db.execute(select(models.User).options(selectinload(models.User.activities)))
+  return result.scalars().all()
+
