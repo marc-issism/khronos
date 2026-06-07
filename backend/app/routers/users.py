@@ -1,12 +1,24 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-from app.schemas.user import UserResponse, UserCreate, UserUpdate
+from app.schemas.user import UserPrivate, UserPublic, UserCreate, UserUpdate, Token
 from app.database import DB
 import app.models as models
 
 # from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from sqlalchemy.orm import selectinload
+
+from datetime import timedelta
+from fastapi.security import OAuth2PasswordRequestForm
+
+from sqlalchemy import func # case insensitive queries
+
+from app.core.auth import create_access_token, hash_password, oauth2_scheme, verify_access_token, verify_password
+
+from app.core.config import SETTINGS
+
 
 
 # await db.refresh(user, attribute_names=["activities"]) when refreshing with relation
@@ -16,7 +28,9 @@ user_router = APIRouter(
 )
 
 @user_router.get(
-  '/'
+  '/',
+  # response_model=UserPublic
+  response_model_include=UserPublic
 )
 async def get_users(db: DB):
   result = await db.execute(select(models.User))
@@ -26,11 +40,11 @@ async def get_users(db: DB):
 
 @user_router.post(
   '/',
-  response_model=UserResponse,
+  response_model=UserPrivate,
   status_code=status.HTTP_201_CREATED
 )
 async def create_user(user: UserCreate, db: DB):
-  result = await db.execute(select(models.User).where(models.User.username == user.username))
+  result = await db.execute(select(models.User).where(func.lower(models.User.username) == user.username.lower()))
   existing_user = result.scalars().first()
 
   if existing_user:
@@ -39,7 +53,7 @@ async def create_user(user: UserCreate, db: DB):
       detail="Username already exists"
     )
   
-  result = await db.execute(select(models.User).where(models.User.email == user.email))
+  result = await db.execute(select(models.User).where(func.lower(models.User.email) == user.email.lower()))
   existing_email = result.scalars().first()
 
   if existing_email:
@@ -50,7 +64,8 @@ async def create_user(user: UserCreate, db: DB):
   
   new_user = models.User(
     username=user.username,
-    email=user.email
+    email=user.email.lower(),
+    password_hash=hash_password(user.password)
   )
 
   db.add(new_user) # stages insert
@@ -60,28 +75,99 @@ async def create_user(user: UserCreate, db: DB):
   return new_user
 
 
+@user_router.post(
+    '/token',
+    response_model=Token
+)
+async def login_for_access_token(
+  form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+  db: DB
+):
+  # Look up user by email, OAuth2PasswordRequestForm uses "username" field but we will use that as email
+  result = await db.execute(
+    select(models.User).where(models.User.email == form_data.username.lower())
+  )
+  user = result.scalars().first()
+
+  if not user or not verify_password(form_data.password, user.password_hash):
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Incorrect email or password",
+      headers={"WWW-Authenticate": "Bearer"}
+    )
+  
+  access_token_expiration = timedelta(minutes=SETTINGS.access_token_expire_minutes)
+  access_token = create_access_token(
+    data={"sub": str(user.id)},
+    expires_delta=access_token_expiration
+  )
+  return Token(access_token=access_token, token_type="bearer") 
+
+
+@user_router.get(
+    '/me',
+    response_model=UserPrivate
+)
+async def get_current_user(
+  token: Annotated[str, Depends(oauth2_scheme)],
+  db: DB
+):
+  user_id = verify_access_token(token)
+  if user_id is None:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Invalid or expired token",
+      headers={"WWW-Authenticate": "Bearer"}
+    )
+
+  try:
+    user_id_int = int(user_id)
+  except (TypeError, ValueError):
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Invalid or expired token",
+      headers={"WWW-Authenticate": "Bearer"}
+    )
+  
+  result = await db.execute(
+    select(models.User).where(models.User.id == user_id_int)
+  )
+  user = result.scalars().first()
+
+  if not user:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="User not found",
+      headers={"WWW-Authenticate": "Bearer"}
+    )
+
+  return user
+
+
 @user_router.get(
   '/{user_id}',
   status_code=status.HTTP_200_OK
 )
 async def get_user_from_id(user_id: int, db: DB):
   result = await db.execute(select(models.User).where(models.User.id == user_id))
-  if not result:
+  user = result.scalars().first()
+  if not user:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
       detail="User does not exist"
     )
-  return result.scalars().first()
+  return user
 
 
+#TODO: Email and username checks 
 @user_router.put(
   '/{user_id}',
-  response_model=UserResponse,
+  response_model=UserPrivate,
   status_code=status.HTTP_200_OK
 )
 async def replace_user(
   user_id: int,
-  user: UserCreate,
+  user: UserPrivate,
   db: DB
 ):
   result = await db.execute(select(models.User).where(models.User.id == user_id))
@@ -98,9 +184,10 @@ async def replace_user(
   return existing_user
 
 
+#TODO: Email and username checks 
 @user_router.patch(
   '/{user_id}',
-  response_model=UserResponse,
+  response_model=UserPrivate,
   status_code=status.HTTP_200_OK
 )
 async def patch_user(

@@ -6,12 +6,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+#TODO: modularize this file into a /models folder
+
 class User(Base):
   __tablename__ = "users"
 
   id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True) # TODO: Change to Uuid
   username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False) # nullable=False means required field
-  email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False) # nullable=False means required field
+  email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+  password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
 
   legend: Mapped[list[Legend]] = relationship(back_populates="user", cascade="all, delete-orphan") # user.legend
   activities: Mapped[list[Activity]] = relationship(back_populates="user", cascade="all, delete-orphan") # user.activities

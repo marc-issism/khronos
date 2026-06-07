@@ -30,7 +30,7 @@ async def lifespan(_app: FastAPI):
 
 # app.mount('/media', staticFiles(directory='media'), name='media') for serving files
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.include_router(user_router)
 app.include_router(legends_router)
 app.include_router(activities_router)
