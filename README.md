@@ -5,6 +5,9 @@ A journal for tracking habits, time, and plans
 
 `source .venv/bin/activate`
 
-`pip install -r ./backend/requirements.txt`
+`pip install -r ./requirements.txt`
+
+### Update requirements.txt
+`pip freeze > ./requirements.txt`
 
 `uvicorn main:app --reload`
