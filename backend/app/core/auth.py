@@ -3,9 +3,21 @@ from datetime import UTC, datetime, timedelta
 import jwt
 
 from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
 from pwdlib import PasswordHash
 
 from app.core.config import SETTINGS
+from app.database import DB
+import app.models as models 
+
+from typing import Annotated
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_session
+
+# 401 -> not authenticated
+# 403 -> not allowed to do that action
+
 
 LOGIN_PATH = "users/token"
 
@@ -60,3 +72,40 @@ def verify_access_token(token: str) -> str | None:
     return None
   else:
     return payload.get("sub")
+
+
+HttpExceptionInvalidToken = HTTPException(
+  status_code=status.HTTP_401_UNAUTHORIZED,
+  detail="Invalid or expired token",
+  headers={"WWW-Authenticate": "Bearer"} 
+)
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: DB
+) -> models.User :
+  user_id = verify_access_token(token)
+  if user_id is None:
+    raise HttpExceptionInvalidToken
+  
+  try: 
+    user_id_int = int(user_id)
+  except (TypeError, ValueError):
+    raise HttpExceptionInvalidToken
+  
+  result = await db.execute(
+    select(models.User).where(models.User.id == user_id_int)
+  )
+  user = result.scalars().first()
+
+  if not user:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="User not found",
+      headers={"WWW-Authenticate": "Bearer"} 
+    )
+  
+  return user
+
+# current user is a models.User object with metadata from get_current_user -> a class
+CurrentUser = Annotated[models.User, Depends(get_current_user)]

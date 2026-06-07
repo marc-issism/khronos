@@ -18,6 +18,11 @@ from app.routers.users import user_router
 from app.routers.legends import legends_router
 from app.routers.activities import activities_router
 
+#TODO: add status code to all routes
+#TODO: add authorizations to all routes
+#TODO: add more route options
+#TODO: add pagination: https://www.youtube.com/watch?v=f1zggIOxmJg&list=PL-osiE80TeTsak-c-QsVeg0YYG_0TeyXI&index=13
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):

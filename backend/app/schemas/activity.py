@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+#TODO: add date_created to ActivityUpdate
+
 class Activity(BaseModel):
-  user_id: int
   legend_key: str
   date: datetime
   start_time: datetime
@@ -14,7 +14,9 @@ class ActivityCreate(Activity):
   pass
 
 class ActivityResponse(Activity):
+  user_id: int
   model_config = ConfigDict(from_attributes=True)
 
 class ActivityUpdate(ActivityCreate):
   pass
+
