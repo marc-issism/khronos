@@ -3,24 +3,19 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-import aiosqlite as aiosqlite
 
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./khronos.db" #TODO: Swap to postgres
-# +aiosqlite is the async engine
+from app.core.config import SETTINGS
 
+#TODO: use this for engine
 # DATABASE = 'postgresql'
 # USER = 'postgres'
 # PASSWORD = 'your password'
 # HOST = 'localhost'
 # PORT = '5432'
 # DB_NAME = 'postgres'
-# engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME }')
+# engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
 
-
-engine = create_async_engine(
-  SQLALCHEMY_DATABASE_URL,
-  connect_args={"check_same_thread": False} #TODO: for sqlite only
-)
+engine = create_async_engine(SETTINGS.database_url)
 
 AsyncSessionLocal = async_sessionmaker(
   engine, 
