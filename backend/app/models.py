@@ -50,7 +50,7 @@ class Activity(Base):
     index=True
   )
   legend_key: Mapped[str] = mapped_column(
-    ForeignKey("legends.key"),
+    ForeignKey("legends.id"),
     nullable=False,
     index=True
   )

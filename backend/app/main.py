@@ -28,8 +28,6 @@ from app.routers.activities import activities_router
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
   # startup
-  async with engine.begin() as connection:
-    await connection.run_sync(Base.metadata.create_all)
   yield
   # shutdown
   await engine.dispose()
